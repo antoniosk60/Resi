@@ -1,0 +1,8 @@
+{
+  "name": "GAVILAN 181",
+  "description": "Control de accesos, visitas, adeudos y gestión condominal de Gavilán 181 operado por Yaotecatl Seguridad Privada.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

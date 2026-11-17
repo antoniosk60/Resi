@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "AuthorizedUser": {
+      "collection": "authorized_users",
+      "description": "Google account whitelist capped at 1 Administrador and up to 5 Capturistas.",
+      "fields": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "slotId": { "type": "string" },
+        "uid": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "addedBy": { "type": "string" },
+        "addedAtMillis": { "type": "number" },
+        "lastActiveMillis": { "type": "number" }
+      }
+    },
+    "CapturistaSlot": {
+      "collection": "capturista_slots",
+      "description": "Fixed slots '1' through '5' enforcing the hard cap of 5 Capturista Google accounts.",
+      "fields": {
+        "email": { "type": "string" },
+        "slotId": { "type": "string" },
+        "assignedAtMillis": { "type": "number" }
+      }
+    },
+    "Resident": {
+      "collection": "residents",
+      "fields": {
+        "id": { "type": "number" },
+        "fullName": { "type": "string" },
+        "houseNumber": { "type": "string" },
+        "building": { "type": "string" },
+        "apartment": { "type": "string" },
+        "accessCode": { "type": "string" },
+        "blockOrSection": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "vehiclePlates": { "type": "string" },
+        "notes": { "type": "string" },
+        "isMoroso": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "registeredDateMillis": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "lastModifiedBy": { "type": "string" },
+        "lastModifiedDateMillis": { "type": "number" }
+      }
+    },
+    "Visit": {
+      "collection": "visits",
+      "fields": {
+        "id": { "type": "number" },
+        "visitorName": { "type": "string" },
+        "visitorIdOrIne": { "type": "string" },
+        "visitorVehiclePlates": { "type": "string" },
+        "building": { "type": "string" },
+        "apartment": { "type": "string" },
+        "residentId": { "type": "number" },
+        "residentName": { "type": "string" },
+        "reason": { "type": "string" },
+        "isResidentMoroso": { "type": "boolean" },
+        "accessStatus": { "type": "string" },
+        "accessCodeUsed": { "type": "string" },
+        "entryTimestampMillis": { "type": "number" },
+        "exitTimestampMillis": { "type": "number" },
+        "registeredBy": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "Tardiness": {
+      "collection": "tardiness",
+      "fields": {
+        "id": { "type": "number" },
+        "residentId": { "type": "number" },
+        "residentName": { "type": "string" },
+        "houseNumber": { "type": "string" },
+        "timestampMillis": { "type": "number" },
+        "reason": { "type": "string" },
+        "vehiclePlate": { "type": "string" },
+        "registeredBy": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "AuditLog": {
+      "collection": "audit_logs",
+      "fields": {
+        "id": { "type": "number" },
+        "timestampMillis": { "type": "number" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "actionType": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityId": { "type": "number" },
+        "title": { "type": "string" },
+        "details": { "type": "string" }
+      }
+    }
+  }
+}

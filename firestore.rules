@@ -1,0 +1,228 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny fallback
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // AUTHENTICATION & 1-ADMIN + 5-CAPTURISTAS ACCESS CONTROL HELPERS
+    // =========================================================================
+
+    function adminEmail() {
+      return 'angelfernandoantonioflores4@gmail.com';
+    }
+
+    function isSignedIn() {
+      return request.auth != null
+        && request.auth.token.email is string
+        && request.auth.token.email.size() > 0;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function authEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isBootstrappedAdmin() {
+      return isEmailVerified() && authEmail() == adminEmail();
+    }
+
+    function isAuthorizedCapturista() {
+      return isEmailVerified()
+        && authEmail() != adminEmail()
+        && exists(/databases/$(database)/documents/authorized_users/$(authEmail()))
+        && get(/databases/$(database)/documents/authorized_users/$(authEmail())).data.role == 'CAPTURISTA'
+        && get(/databases/$(database)/documents/authorized_users/$(authEmail())).data.slotId in ['1', '2', '3', '4', '5'];
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin();
+    }
+
+    function isAuthorizedStaff() {
+      return isAdmin() || isAuthorizedCapturista();
+    }
+
+    // =========================================================================
+    // SCHEMA VALIDATORS
+    // =========================================================================
+
+    function isValidAuthorizedUser(d, emailKey) {
+      return d.keys().hasAll(['email', 'displayName', 'role', 'slotId', 'addedBy', 'addedAtMillis'])
+        && d.email is string
+        && d.email.lower() == emailKey
+        && d.displayName is string && d.displayName.size() > 0 && d.displayName.size() <= 120
+        && d.role in ['ADMINISTRADOR', 'CAPTURISTA']
+        && d.slotId is string
+        && d.addedBy is string
+        && d.addedAtMillis is int
+        && (!('uid' in d) || d.uid is string)
+        && (!('photoUrl' in d) || d.photoUrl is string)
+        && (!('lastActiveMillis' in d) || d.lastActiveMillis is int);
+    }
+
+    function isValidResident(d) {
+      return d.keys().hasAll(['id', 'fullName', 'building', 'apartment', 'accessCode', 'isMoroso', 'isActive'])
+        && d.id is int
+        && d.fullName is string && d.fullName.size() > 0 && d.fullName.size() <= 160
+        && d.building is string && d.building.size() <= 80
+        && d.apartment is string && d.apartment.size() <= 80
+        && d.accessCode is string && d.accessCode.size() <= 64
+        && d.isMoroso is bool
+        && d.isActive is bool
+        && (!('houseNumber' in d) || d.houseNumber is string)
+        && (!('blockOrSection' in d) || d.blockOrSection is string)
+        && (!('phone' in d) || d.phone is string)
+        && (!('email' in d) || d.email is string)
+        && (!('vehiclePlates' in d) || d.vehiclePlates is string)
+        && (!('notes' in d) || d.notes is string)
+        && (!('registeredDateMillis' in d) || d.registeredDateMillis is int)
+        && (!('createdBy' in d) || d.createdBy is string)
+        && (!('lastModifiedBy' in d) || d.lastModifiedBy is string)
+        && (!('lastModifiedDateMillis' in d) || d.lastModifiedDateMillis is int);
+    }
+
+    function isValidVisit(d) {
+      return d.keys().hasAll(['id', 'visitorName', 'building', 'apartment', 'accessStatus', 'entryTimestampMillis'])
+        && d.id is int
+        && d.visitorName is string && d.visitorName.size() > 0 && d.visitorName.size() <= 160
+        && d.building is string && d.building.size() <= 80
+        && d.apartment is string && d.apartment.size() <= 80
+        && d.accessStatus is string && d.accessStatus.size() > 0
+        && d.entryTimestampMillis is int
+        && (!('exitTimestampMillis' in d) || d.exitTimestampMillis == null || d.exitTimestampMillis is int)
+        && (!('isResidentMoroso' in d) || d.isResidentMoroso is bool);
+    }
+
+    function isValidTardiness(d) {
+      return d.keys().hasAll(['id', 'residentId', 'residentName', 'houseNumber', 'timestampMillis', 'reason', 'registeredBy'])
+        && d.id is int
+        && d.residentId is int
+        && d.residentName is string && d.residentName.size() > 0 && d.residentName.size() <= 160
+        && d.houseNumber is string
+        && d.timestampMillis is int
+        && d.reason is string && d.reason.size() > 0 && d.reason.size() <= 300
+        && d.registeredBy is string;
+    }
+
+    function isValidAuditLog(d) {
+      return d.keys().hasAll(['id', 'timestampMillis', 'userName', 'userRole', 'actionType', 'entityType', 'entityId', 'title', 'details'])
+        && d.id is int
+        && d.timestampMillis is int
+        && d.userName is string && d.userName.size() > 0
+        && d.userRole is string
+        && d.actionType is string && d.actionType.size() > 0
+        && d.entityType is string && d.entityType.size() > 0
+        && d.entityId is int
+        && d.title is string && d.title.size() > 0
+        && d.details is string;
+    }
+
+    // =========================================================================
+    // AUTHORIZED GOOGLE ACCOUNTS (1 ADMINISTRADOR + MAX 5 CAPTURISTAS)
+    // =========================================================================
+
+    match /capturista_slots/{slotId} {
+      allow read: if isAuthorizedStaff();
+      allow create: if isAdmin()
+        && slotId in ['1', '2', '3', '4', '5']
+        && request.resource.data.keys().hasAll(['email', 'slotId', 'assignedAtMillis'])
+        && request.resource.data.email is string
+        && request.resource.data.email != adminEmail()
+        && request.resource.data.slotId == slotId
+        && request.resource.data.assignedAtMillis is int;
+      allow update: if false;
+      allow delete: if isAdmin() && slotId in ['1', '2', '3', '4', '5'];
+    }
+
+    match /authorized_users/{emailKey} {
+      allow read: if (isEmailVerified() && authEmail() == emailKey) || isAdmin();
+
+      // Create:
+      // - The single bootstrapped Admin may initialize their own doc with role ADMINISTRADOR and slotId '0'.
+      // - Only the Admin may add up to 5 Capturistas, each bound atomically to an unoccupied slotId '1'..'5'.
+      allow create: if isValidAuthorizedUser(request.resource.data, emailKey) && (
+        (
+          isBootstrappedAdmin()
+          && emailKey == adminEmail()
+          && request.resource.data.role == 'ADMINISTRADOR'
+          && request.resource.data.slotId == '0'
+        ) || (
+          isAdmin()
+          && emailKey != adminEmail()
+          && request.resource.data.role == 'CAPTURISTA'
+          && request.resource.data.slotId in ['1', '2', '3', '4', '5']
+          && getAfter(/databases/$(database)/documents/capturista_slots/$(request.resource.data.slotId)).data.email == emailKey
+        )
+      );
+
+      // Update:
+      // - Admin can update metadata while preserving role/slot invariants.
+      // - Authorized user can update only their own session metadata (uid, displayName, photoUrl, lastActiveMillis) without elevating role.
+      allow update: if isValidAuthorizedUser(request.resource.data, emailKey) && (
+        (
+          isAdmin()
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.slotId == resource.data.slotId
+        ) || (
+          isEmailVerified()
+          && authEmail() == emailKey
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['uid', 'displayName', 'photoUrl', 'lastActiveMillis'])
+        )
+      );
+
+      // Delete: Only Admin can revoke a Capturista; the Admin account itself cannot be deleted.
+      allow delete: if isAdmin() && emailKey != adminEmail();
+    }
+
+    // =========================================================================
+    // CONDOMINIUM OPERATIONAL COLLECTIONS (GAVILAN 181 - YAOTECATL)
+    // =========================================================================
+
+    match /residents/{residentId} {
+      allow read: if isAuthorizedStaff();
+      allow create: if isAuthorizedStaff() && isValidResident(request.resource.data);
+      allow update: if isAuthorizedStaff() && isValidResident(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /visits/{visitId} {
+      allow read: if isAuthorizedStaff();
+      allow create: if isAuthorizedStaff() && isValidVisit(request.resource.data);
+      allow update: if isAuthorizedStaff() && isValidVisit(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /tardiness/{tardinessId} {
+      allow read: if isAuthorizedStaff();
+      allow create: if isAuthorizedStaff() && isValidTardiness(request.resource.data);
+      allow update: if isAuthorizedStaff() && isValidTardiness(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAuthorizedStaff();
+      allow create: if isAuthorizedStaff() && isValidAuditLog(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Legacy collections: readable/cleanable by authorized staff when clearing old moroso flags; no new writes
+    match /debts/{debtId} {
+      allow read, delete: if isAuthorizedStaff();
+      allow create, update: if isAdmin();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthorizedStaff();
+      allow write: if false;
+    }
+  }
+}
